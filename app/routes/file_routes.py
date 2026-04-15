@@ -86,11 +86,14 @@ def download_file(token: str):
     db = SessionLocal()
 
     try:
-        result = db.execute(text("""
-            SELECT stored_name, filename, expires_at, status
-            FROM files
-            WHERE token = :token
-        """), {"token": token}).fetchone()
+        result = db.execute(
+            text("""
+                SELECT stored_name, filename, expires_at, status
+                FROM files
+                WHERE token = :token
+            """),
+            {"token": token}
+        ).fetchone()
 
     except Exception as e:
         print("Error DB:", e)
@@ -99,27 +102,23 @@ def download_file(token: str):
     finally:
         db.close()
 
-    #No existe
+    # 👇 AQUÍ VA TU CÓDIGO
     if not result:
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
     stored_name, filename, expires_at, status = result
 
-    # Estado inválido
     if status != "active":
         raise HTTPException(status_code=400, detail="Archivo no disponible")
 
-    # Expirado
-    if datetime.now() > expires_at:
+    if expires_at and datetime.now() > expires_at:
         raise HTTPException(status_code=400, detail="Archivo expirado")
 
     file_path = os.path.join(UPLOAD_DIR, stored_name)
 
-    # No existe físicamente
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Archivo no encontrado en servidor")
 
-    # ✅ Descargar archivo
     return FileResponse(
         path=file_path,
         filename=filename,
